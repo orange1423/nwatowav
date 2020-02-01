@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/hasenbanck/nwa"
+	"github.com/orange1423/nwa"
 	"io"
 	"log"
 	"os"
