@@ -14,6 +14,7 @@ import (
 )
 
 var inputfile = flag.String("inputfile", "", "path to the input file.")
+var outputfile = flag.String("outputfile", "", "path to the output file.")
 
 type fileType int
 
@@ -30,6 +31,10 @@ func main() {
 	if *inputfile == "" {
 		log.Fatal("You need to define an input file!")
 	}
+	if *outputfile == "" {
+		log.Fatal("You need to define an output file!")
+	}
+
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -66,7 +71,7 @@ func main() {
 		log.Fatal("This program can only handle .nwa/.nwk/.ovk files right now.")
 	}
 
-	outfilename = strings.Split(*inputfile, ".")[0]
+	outfilename = strings.Split(*outputfile, ".")[0]
 
 	if filetype == NWA {
 		var data io.Reader
