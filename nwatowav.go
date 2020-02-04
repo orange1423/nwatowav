@@ -5,16 +5,20 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/orange1423/nwa"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/orange1423/nwa"
 )
 
 var inputfile = flag.String("inputfile", "", "path to the input file.")
-var outputfile = flag.String("outputfile", "", "path to the output file.")
+var outputpath = flag.String("outputpath", "", "path to the output file.")
+var logger *log.Logger
 
 type fileType int
 
@@ -27,21 +31,29 @@ const (
 
 func main() {
 	flag.Parse()
-
+	exepath, err := os.Executable()
+	if err != nil {
+		log.Fatalln("fail to create log path!")
+	}
+	dir := filepath.Dir(exepath)
+	logfile, err := os.OpenFile(dir+"\\log\\"+time.Now().Format("2006-01-02")+".log", os.O_APPEND|os.O_CREATE, 666)
+	if err != nil {
+		log.Fatalln("fail to create log file!")
+	}
+	logger = log.New(logfile, "", log.LstdFlags|log.Lshortfile)
 	if *inputfile == "" {
-		log.Fatal("You need to define an input file!")
+		logger.Fatal("You need to define an input file!")
 	}
-	if *outputfile == "" {
-		log.Fatal("You need to define an output file!")
+	if *outputpath == "" {
+		logger.Fatal("You need to define an output file!")
 	}
-
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	file, err := os.Open(*inputfile)
 	defer file.Close()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	var outfilename, outext, outpath string
@@ -68,15 +80,17 @@ func main() {
 		}
 	}
 	if filetype == NONE {
-		log.Fatal("This program can only handle .nwa/.nwk/.ovk files right now.")
+		logger.Fatal("This program can only handle .nwa/.nwk/.ovk files right now.")
 	}
 
-	outfilename = strings.Split(*outputfile, ".")[0]
+	var fileName string
+	fileName = strings.Split(filepath.Base(*inputfile), ".")[0]
+	outfilename = *outputpath + fileName
 
 	if filetype == NWA {
 		var data io.Reader
 		if data, err = nwa.NewNwaFile(file); err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 
 		outpath = fmt.Sprintf("%s.%s", outfilename, outext)
@@ -84,21 +98,21 @@ func main() {
 		var out *os.File
 		out, err = os.Create(outpath)
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		defer out.Close()
 
 		if _, err = io.Copy(out, data); err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	} else { // NWK or OVK files
 		var indexcount int32
 		binary.Read(file, binary.LittleEndian, &indexcount)
 		if indexcount <= 0 {
 			if filetype == OVK {
-				log.Fatalf("Invalid Ogg-ovk file: %s: index = %d\n", inputfile, indexcount)
+				logger.Fatalf("Invalid Ogg-ovk file: %s: index = %d\n", inputfile, indexcount)
 			} else {
-				log.Fatalf("Invalid Koe-nkw file: %s: index = %d\n", inputfile, indexcount)
+				logger.Fatalf("Invalid Koe-nkw file: %s: index = %d\n", inputfile, indexcount)
 			}
 		}
 
@@ -111,7 +125,7 @@ func main() {
 		for i = 0; i < indexcount; i++ {
 			buffer := new(bytes.Buffer)
 			if count, err := io.CopyN(buffer, file, headblksz); count != headblksz || err != nil {
-				log.Fatal("Couldn't read the index entries!")
+				logger.Fatal("Couldn't read the index entries!")
 			}
 			binary.Read(buffer, binary.LittleEndian, &tblsiz[i])
 			binary.Read(buffer, binary.LittleEndian, &tbloff[i])
@@ -122,7 +136,7 @@ func main() {
 		c := make(chan int, indexcount)
 		for i = 0; i < indexcount; i++ {
 			if tbloff[i] <= 0 || tblsiz[i] <= 0 {
-				log.Fatalf("Invalid table[%d]: cnt %d, off %d, size %d\n", i, tblcnt[i], tbloff[i], tblsiz[i])
+				logger.Fatalf("Invalid table[%d]: cnt %d, off %d, size %d\n", i, tblcnt[i], tbloff[i], tblsiz[i])
 				continue
 			}
 			outpath = fmt.Sprintf("%s-%d.%s", outfilename, tblcnt[i], outext)
@@ -141,18 +155,18 @@ func doDecode(filetype fileType, filename string, datafile string, offset int32,
 	file, err := os.Open(datafile)
 	defer file.Close()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	buffer := new(bytes.Buffer)
 	file.Seek(int64(offset), 0)
 	if count, err = io.CopyN(buffer, file, int64(size)); count != int64(size) || err != nil {
-		log.Fatalf("Couldn't read the data for filename %s: off %d, size %d. Error: %s\n", filename, offset, size, err)
+		logger.Fatalf("Couldn't read the data for filename %s: off %d, size %d. Error: %s\n", filename, offset, size, err)
 	}
 
 	if filetype == NWK {
 		if data, err = nwa.NewNwaFile(buffer); err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	} else {
 		data = buffer
@@ -160,11 +174,11 @@ func doDecode(filetype fileType, filename string, datafile string, offset int32,
 
 	out, err := os.Create(filename)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	defer out.Close()
 	if _, err := io.Copy(out, data); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	c <- 1
 }
