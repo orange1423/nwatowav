@@ -47,7 +47,6 @@ func main() {
 	if *outputpath == "" {
 		logger.Fatal("You need to define an output file!")
 	}
-
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	file, err := os.Open(*inputfile)
