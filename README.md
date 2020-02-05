@@ -15,7 +15,7 @@ cd nwatowav
 
 go build
 
-./nwatowav --inputfile="FILENAME"
+./nwatowav --inputfile="FILENAME" --outputpath="OUTPUTPATH"
 
 ## LICENSE
 This programm is licensed under the GNU General Public License version 3
